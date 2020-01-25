@@ -21,46 +21,17 @@ while True:
     while True:
         data = connection.recv(256)
         if data:
-            data = str(data)
+            data = data.decode('utf-8')
             print('Data received %s' % data)
-
-            connection.send(bytes('Got it!', 'utf8'))
+            try:
+                result = str(eval(data))
+            except:
+                result = 'Invalid!'
+            connection.send(bytes(result, 'utf8'))
         else:
             break
 
     connection.close()
-
-def optimize_expression(expression):
-    while True:
-        result = expression.replace("++", "+")
-        result = result.replace("--", "+")
-        if result == expression: 
-            return result
-        expression = result
-
-
-def validate_expression(expression):
-    paranth_count = 0
-    for c in expression:
-        if c not in "+-*/ 0123456789.":
-            return False
-        if c == '(':
-            paranth_count = paranth_count + 1
-        if c == ')':
-            paranth_count = paranth_count - 1
-    if paranth_count != 0:
-        return False
-    return True
-            
-
-OPERATORS = "+-*/"
-
-def parse_expression(expression):
-    result_str = ''
-    for c in expression:
-        if (c >= '0' and c <= '9') or c == '.':
-            result_str += c
-
 
 
     
