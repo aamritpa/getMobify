@@ -1,0 +1,93 @@
+# rebuild and push with `docker build -f base-image-dockerfile .`
+# `docker tag <hash of build> mobify/bridging_languages`
+# `docker tag <hash of build> mobify/bridging_languages:latest`
+# `docker push mobify/bridging_languages`
+
+FROM ubuntu:19.10
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV DEBCONF_NONINTERACTIVE_SEEN=true
+
+# Setup Go PPA
+RUN \
+    apt-get -q update && apt-get -q install -y software-properties-common && \
+    add-apt-repository ppa:longsleep/golang-backports
+
+# Update packages again
+RUN \
+    apt-get -q update && \
+    apt-get -y -q upgrade
+
+# Install dependencies for installing swift and also curl, vim and git
+RUN apt-get -q install -y \
+    build-essential \
+    curl \
+    vim \
+    gdb \
+    libtinfo5 \
+    libncurses5 \
+    libatomic1 \
+    libcurl4 \
+    libxml2 \
+    libedit2 \
+    libsqlite3-0 \
+    libc6-dev \
+    binutils \
+    libgcc-9-dev \
+    libstdc++-9-dev \
+    libpython2.7 \
+    tzdata \
+    git \
+    pkg-config
+
+# Install the languages that have recentish versions in ubuntu 19.10
+RUN apt-get -q install -y clang-9
+# some npm modules need this to build
+RUN apt-get -q install -y python2.7-minimal 
+RUN apt-get -q install -y nodejs npm
+RUN apt-get -q install -y python3 pipenv python-virtualenv
+RUN apt-get -q install -y golang-go
+RUN apt-get -q install -y openjdk-11-jdk-headless
+RUN apt-get -q install -y ruby-full
+RUN apt-get -q install -y haskell-platform
+
+# Rust install as recommended from https://www.rust-lang.org
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+
+# Clojure install cobbled from https://clojure.org/guides/getting_started#_installation_on_linux
+RUN curl https://download.clojure.org/install/linux-install-1.10.1.502.sh | bash
+
+# Swift installation copied from https://github.com/apple/swift-docker/blob/72177227fe1ed2da8e921ba291aeb3ff69591e1a/5.1/ubuntu/18.04/Dockerfile
+ARG SWIFT_SIGNING_KEY=A62AE125BBBFBB96A6E042EC925CC1CCED3D1561
+ARG SWIFT_PLATFORM=ubuntu18.04
+ARG SWIFT_BRANCH=swift-5.1.3-release
+ARG SWIFT_VERSION=swift-5.1.3-RELEASE
+ARG SWIFT_WEBROOT=https://swift.org/builds/
+
+ENV SWIFT_SIGNING_KEY=$SWIFT_SIGNING_KEY \
+    SWIFT_PLATFORM=$SWIFT_PLATFORM \
+    SWIFT_BRANCH=$SWIFT_BRANCH \
+    SWIFT_VERSION=$SWIFT_VERSION \
+    SWIFT_WEBROOT=$SWIFT_WEBROOT
+
+RUN set -e; \
+    SWIFT_WEBDIR="$SWIFT_WEBROOT/$SWIFT_BRANCH/$(echo $SWIFT_PLATFORM | tr -d .)/" \
+    && SWIFT_BIN_URL="$SWIFT_WEBDIR/$SWIFT_VERSION/$SWIFT_VERSION-$SWIFT_PLATFORM.tar.gz" \
+    && SWIFT_SIG_URL="$SWIFT_BIN_URL.sig" \
+    # - Grab curl here so we cache better up above
+    && export DEBIAN_FRONTEND=noninteractive \
+    && apt-get -q update && apt-get -q install -y curl && rm -rf /var/lib/apt/lists/* \
+    # - Download the GPG keys, Swift toolchain, and toolchain signature, and verify.
+    && export GNUPGHOME="$(mktemp -d)" \
+    && curl -fsSL "$SWIFT_BIN_URL" -o swift.tar.gz "$SWIFT_SIG_URL" -o swift.tar.gz.sig \
+    && gpg --batch --quiet --keyserver ha.pool.sks-keyservers.net --recv-keys "$SWIFT_SIGNING_KEY" \
+    && gpg --batch --verify swift.tar.gz.sig swift.tar.gz \
+    # - Unpack the toolchain, set libs permissions, and clean up.
+    && tar -xzf swift.tar.gz --directory / --strip-components=1 \
+    && chmod -R o+r /usr/lib/swift \
+    && rm -rf "$GNUPGHOME" swift.tar.gz.sig swift.tar.gz
+
+CMD ["/bin/bash"]
+
+RUN bash -c 'echo "source $HOME/.cargo/env" >> /root/.profile'
+RUN bash -c 'echo "source $HOME/.cargo/env" >> /root/.bashrc'
