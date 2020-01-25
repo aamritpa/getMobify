@@ -33,10 +33,11 @@ def main(argv):
         rawNums[idx] = int(rawNums[idx])
     nums = rawNums
     quicksort(nums)
+    res = ""
     for i in nums:
-        print(i, end = ' ')
+        res = res + str(i) + " "
+    print(res)
     print()
-
     
 if __name__ == "__main__":
     main(sys.argv[1:])
